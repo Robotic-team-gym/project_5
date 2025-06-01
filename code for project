@@ -1,0 +1,176 @@
+from tkinter import *
+import math, os, sys
+from time import sleep
+import face_recognition
+from deepface import DeepFace
+from keras.models import load_model
+import cv2
+import numpy as np
+from keras.preprocessing.image import img_to_array
+from keras.models import Sequential
+from keras.layers import Input, Conv2D, Flatten, Dense
+import pygame
+from pygame import mixer
+import threading
+
+known_face_encodings = []
+known_face_names = []
+
+cap = cv2.VideoCapture(0)
+
+
+
+
+known_person1_image=face_recognition.load_image_file("/Users/User/Documents/ΔΗΜΗΤΡΗΣ/...../MYRTO.jpg")
+known_person1_encoding=face_recognition.face_encodings(known_person1_image)[0]
+known_face_encodings.append(known_person1_encoding)
+known_face_names.append("MYRTO")
+
+known_person2_image=face_recognition.load_image_file("/Users/User/Documents/.......anna.jpg")
+known_person2_encoding=face_recognition.face_encodings(known_person2_image)[0]
+known_face_encodings.append(known_person2_encoding)
+known_face_names.append("ANNA")
+
+known_person3_image=face_recognition.load_image_file("/Users/User/Documents/......../IMG_20241113_192604.jpg")
+known_person3_encoding=face_recognition.face_encodings(known_person3_image)[0]
+known_face_encodings.append(known_person3_encoding)
+known_face_names.append("DIMITRIS")
+
+def Faces_Recognition(last_name):
+    
+    name = "Unknown"
+    
+    ret, frame = cap.read()
+    if not ret:
+        
+        print("Πρόβλημα στην κάμερα.")
+        return name
+    
+    face_locations = face_recognition.face_locations(frame)
+    
+    face_encodings = face_recognition.face_encodings(frame, face_locations)
+    
+    frame = cv2.flip(frame, 1)
+
+    for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+        matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+
+        if True in matches:
+            first_match_index = matches.index(True)
+            name = known_face_names[first_match_index]
+
+        #if name != last_name:
+           # print("Detected new face:", name)
+    return name
+
+
+def recognize_emotions(last_emotion):
+    emotion = "Unknown"
+    try:
+        ret, frame = cap.read()
+        if not ret:
+            print("Πρόβλημα στην κάμερα.")
+            return emotion
+
+        frame = cv2.flip(frame, 1)
+        analysis = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+
+        emotion = analysis[0]['dominant_emotion'] if isinstance(analysis, list) else 'Unknown'
+        if emotion != last_emotion:
+            print(f"Detected emotion: {emotion}")
+        return emotion
+    except Exception as e:
+        print("Σφάλμα στην αναγνώριση:", e)
+        return last_emotion
+
+
+
+def play_sound(file_path):
+    pygame.init()
+    pygame.mixer.init()
+    if not pygame.mixer.music.get_busy():  
+        pygame.mixer.music.load(file_path)                                                                                                                                   
+        pygame.mixer.music.play()
+        
+
+def play_sound_async(file_path):
+    def play():
+        pygame.init()
+        pygame.mixer.init()
+        if not pygame.mixer.music.get_busy():  
+            pygame.mixer.music.load(file_path)
+            pygame.mixer.music.play()
+    
+    
+    threading.Thread(target=play).start()
+    
+
+
+
+def Make_dialogos_test():
+    
+
+    last_emotion = "Unknown"
+    
+    last_name = "Unknown"
+
+
+    last_recognation_face = None
+    last_recognation_emotion = None
+    
+    while True:
+        ret, frame = cap.read()
+        frame = cv2.flip(frame, 1)
+        name = Faces_Recognition(last_name) 
+        emotion = recognize_emotions(last_emotion)
+        
+        if name != last_recognation_face or emotion != last_recognation_emotion:
+            
+            if name != last_recognation_face:
+                # Αν αλλάξει το πρόσωπο, αναπαράγουμε τον ήχο για το νέο πρόσωπο
+                if name == "DIMITRIS":
+                    
+                    play_sound("/Users/User/Documents/...../gia_sou_DIMITRIS.mp3")
+                    if emotion == "angry" or emotion == "sad":
+                        play_sound_async("/Users/User/Documents/...../angry_mp3.mp3")
+                    elif emotion == "happy" or emotion == "neutral":
+                        play_sound_async("/Users/User/Documents/....../happy_mp3.mp3")
+                elif name == "MYRTO":
+                    play_sound("/Users/User/Documents/...../gia_sou_MYRTO.mp3")
+                    if emotion == "angry" or emotion == "sad":
+                        play_sound_async("/Users/User/Documents/...../angry_mp3.mp3")
+                    elif emotion == "happy" or emotion == "neutral":
+                        play_sound_async("/Users/User/Documents/...../happy_mp3.mp3")
+
+            # Αν αλλάξει το συναίσθημα, αναπαράγουμε τον ήχο που σχετίζεται με το συναίσθημα
+            if emotion == "angry" or emotion == "sad":
+                if name == "DIMITRIS":
+                    play_sound_async("/Users/User/Documents/....../angry_mp3.mp3")
+                elif name == "MYRTO":
+                    play_sound_async("/Users/User/Documents/...../angry_mp3.mp3")
+            elif emotion == "happy" or emotion == "neutral":
+                if name == "DIMITRIS":
+                    play_sound_async("/Users/User/Documents/...../happy_mp3.mp3")
+                elif name == "MYRTO":
+                    play_sound_async("/Users/User/Documents/...../happy_mp3.mp3")
+
+            # Ενημέρωση της μεταβλητής για το τελευταίο αναγνωρισμένο πρόσωπο και συναίσθημα
+            last_recognation_face = name
+            last_recognation_emotion = emotion
+
+        # Εμφάνιση συναισθήματος και ονόματος στην εικόνα
+        cv2.putText(frame, f'Emotion: {emotion}', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(frame, f'Name: {name}', (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+
+        # Εμφάνιση της εικόνας
+        cv2.imshow("Emotion Recognition", frame)
+
+        # Έξοδος από το πρόγραμμα αν πατηθεί το 'q'
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    Make_dialogos_test()
